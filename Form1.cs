@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using CodeShare.Controls;
 
 namespace CodeShare;
 
@@ -17,23 +18,31 @@ public partial class Form1 : Form
     private ClientWebSocket? socket;
     private CancellationTokenSource? cancellationTokenSource;
 
-    private Label statusLabel = null!;
+    // Header
+    private StatusPill statusPill = null!;
+
+    // Room bar
     private Label roomLabel = null!;
     private Label usersLabel = null!;
-    private TextBox usernameBox = null!;
-    private TextBox roomBox = null!;
-    private TextBox messageBox = null!;
-    private TextBox receivedBox = null!;
 
-    private Button createButton = null!;
-    private Button joinButton = null!;
-    private Button sendButton = null!;
-    private Button copyButton = null!;
-    private Button pasteButton = null!;
-    private Button historyButton = null!;
-    private Button leaveButton = null!;
+    // Inputs
+    private ModernTextBox usernameBox = null!;
+    private ModernTextBox roomBox = null!;
+    private ModernTextBox messageBox = null!;
 
-    private readonly List<string> history = new();
+    // Messages
+    private ChatListBox chatList = null!;
+
+    // Buttons
+    private ModernButton createButton = null!;
+    private ModernButton joinButton = null!;
+    private ModernButton sendButton = null!;
+    private ModernButton copyButton = null!;
+    private ModernButton pasteButton = null!;
+    private ModernButton historyButton = null!;
+    private ModernButton leaveButton = null!;
+
+    private readonly List<ChatMessage> history = new();
 
     // Stores only the text of the latest message
     private string lastMessageText = "";
@@ -52,157 +61,195 @@ public partial class Form1 : Form
     {
         Controls.Clear();
 
+        const int margin = 28;
+        const int gap = 14;
+
         Text = "CodeShare";
-        Width = 850;
-        Height = 720;
-        MinimumSize = new Size(700, 600);
+        Width = 980;
+        Height = 900;
+        MinimumSize = new Size(860, 760);
         StartPosition = FormStartPosition.CenterScreen;
 
-        BackColor = Color.FromArgb(18, 18, 18);
-        ForeColor = Color.White;
-        Font = new Font("Segoe UI", 10);
+        BackColor = AppTheme.WindowBackground;
+        ForeColor = AppTheme.TextPrimary;
+        Font = AppTheme.FontBody;
+        DoubleBuffered = true;
 
-        // TITLE
+        int cardWidth = Math.Max(320, ClientSize.Width - (margin * 2));
+
+        // ---------------- HEADER ----------------
+        var logoMark = new LogoMark
+        {
+            Location = new Point(margin, 20),
+        };
+
         var title = new Label
         {
             Text = "CodeShare",
-            Font = new Font("Segoe UI", 26, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(30, 25),
-            AutoSize = true
+            Font = AppTheme.FontDisplay,
+            ForeColor = AppTheme.TextPrimary,
+            BackColor = Color.Transparent,
+            Location = new Point(margin + 52, 14),
+            AutoSize = true,
         };
 
         var subtitle = new Label
         {
-            Text = "Share text and code instantly",
-            Font = new Font("Segoe UI", 10),
-            ForeColor = Color.Gray,
-            Location = new Point(33, 68),
-            AutoSize = true
+            Text = "Share text and code, instantly.",
+            Font = AppTheme.FontSubtitle,
+            ForeColor = AppTheme.TextSecondary,
+            BackColor = Color.Transparent,
+            Location = new Point(margin + 54, 44),
+            AutoSize = true,
         };
 
-        // USERNAME
-        var usernameLabel = new Label
+        statusPill = new StatusPill
         {
-            Text = "Your name",
-            ForeColor = Color.LightGray,
-            Location = new Point(32, 110),
-            AutoSize = true
+            Top = 24,
         };
 
-        usernameBox = new TextBox
+        var divider = new Panel
         {
-            Location = new Point(30, 135),
-            Width = 210,
-            Height = 32,
+            Location = new Point(margin, 80),
+            Size = new Size(cardWidth, 1),
+            BackColor = AppTheme.Border,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+        };
+
+        // ---------------- CONNECT CARD ----------------
+        var connectCard = new RoundedPanel
+        {
+            Location = new Point(margin, 95),
+            Size = new Size(cardWidth, 140),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+        };
+
+        var nameLabel = MakeSectionLabel("YOUR NAME", 20, 12);
+
+        usernameBox = new ModernTextBox
+        {
+            Location = new Point(20, 32),
+            Size = new Size(230, 42),
             MaxLength = 32,
-            BackColor = Color.FromArgb(35, 35, 35),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
+            PlaceholderText = "Enter your name",
         };
 
-        // ROOM
-        var roomCodeLabel = new Label
-        {
-            Text = "Room code",
-            ForeColor = Color.LightGray,
-            Location = new Point(260, 110),
-            AutoSize = true
-        };
+        var roomCodeLabel = MakeSectionLabel("ROOM CODE", 270, 12);
 
-        roomBox = new TextBox
+        roomBox = new ModernTextBox
         {
-            Location = new Point(258, 135),
-            Width = 150,
-            Height = 32,
+            Location = new Point(270, 32),
+            Size = new Size(100, 42),
             MaxLength = 4,
-            BackColor = Color.FromArgb(35, 35, 35),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
+            PlaceholderText = "0000",
+            TextAlignment = HorizontalAlignment.Center,
+        };
+        roomBox.Inner.Font = AppTheme.FontRoomCode;
+
+        createButton = MakeButton("Create Room", ButtonKind.Primary, 20, 90, 200, 38);
+        joinButton = MakeButton("Join Room", ButtonKind.Secondary, 230, 90, 160, 38);
+
+        connectCard.Controls.Add(nameLabel);
+        connectCard.Controls.Add(usernameBox);
+        connectCard.Controls.Add(roomCodeLabel);
+        connectCard.Controls.Add(roomBox);
+        connectCard.Controls.Add(createButton);
+        connectCard.Controls.Add(joinButton);
+
+        // ---------------- ROOM STATUS BAR ----------------
+        var roomBar = new RoundedPanel
+        {
+            Location = new Point(margin, connectCard.Bottom + gap),
+            Size = new Size(cardWidth, 60),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            CornerRadius = 14,
         };
 
-        createButton = MakeButton("CREATE ROOM", 425, 133, 140);
-        joinButton = MakeButton("JOIN ROOM", 575, 133, 140);
-
-        // ROOM INFO
         roomLabel = new Label
         {
-            Text = "Room: -",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(32, 185),
-            AutoSize = true
+            Text = "Room: —",
+            Font = AppTheme.FontRoomLabel,
+            ForeColor = AppTheme.TextPrimary,
+            BackColor = Color.Transparent,
+            Location = new Point(20, 10),
+            AutoSize = true,
         };
 
         usersLabel = new Label
         {
-            Text = "Users: 0/10",
-            ForeColor = Color.Gray,
-            Location = new Point(170, 187),
-            AutoSize = true
+            Text = "0 / 10 users",
+            Font = AppTheme.FontBody,
+            ForeColor = AppTheme.TextSecondary,
+            BackColor = Color.Transparent,
+            Location = new Point(20, 33),
+            AutoSize = true,
         };
 
-        leaveButton = MakeButton("LEAVE", 615, 180, 100);
+        leaveButton = MakeButton("Leave Room", ButtonKind.Danger, roomBar.Width - 114, 12, 94, 36);
+        leaveButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         leaveButton.Enabled = false;
 
-        // MESSAGE AREA
-        messageBox = new TextBox
+        roomBar.Controls.Add(roomLabel);
+        roomBar.Controls.Add(usersLabel);
+        roomBar.Controls.Add(leaveButton);
+
+        // ---------------- COMPOSE CARD ----------------
+        var composeCard = new RoundedPanel
         {
-            Location = new Point(30, 225),
-            Width = 685,
-            Height = 145,
-            Multiline = true,
-            ScrollBars = ScrollBars.Vertical,
-            AcceptsTab = true,
-            BackColor = Color.FromArgb(28, 28, 28),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            Location = new Point(margin, roomBar.Bottom + gap),
+            Size = new Size(cardWidth, 190),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
 
-        pasteButton = MakeButton("PASTE", 30, 385, 100);
+        var composeLabel = MakeSectionLabel("COMPOSE", 20, 12);
 
-        sendButton = MakeButton("SEND", 140, 385, 120);
+        messageBox = new ModernTextBox
+        {
+            Location = new Point(20, 32),
+            Size = new Size(composeCard.Width - 40, 92),
+            Multiline = true,
+            AcceptsTab = true,
+            PlaceholderText = "Write your code or message here...",
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+        };
+        messageBox.Inner.Font = AppTheme.FontMono;
+
+        pasteButton = MakeButton("Paste", ButtonKind.Ghost, 20, 136, 90, 34);
+        copyButton = MakeButton("Copy", ButtonKind.Ghost, 120, 136, 90, 34);
+        historyButton = MakeButton("History", ButtonKind.Ghost, 220, 136, 100, 34);
+
+        sendButton = MakeButton("Send", ButtonKind.Primary, composeCard.Width - 130, 136, 110, 34);
+        sendButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         sendButton.Enabled = false;
 
-        copyButton = MakeButton("COPY", 270, 385, 100);
+        composeCard.Controls.Add(composeLabel);
+        composeCard.Controls.Add(messageBox);
+        composeCard.Controls.Add(pasteButton);
+        composeCard.Controls.Add(copyButton);
+        composeCard.Controls.Add(historyButton);
+        composeCard.Controls.Add(sendButton);
 
-        historyButton = MakeButton("HISTORY", 380, 385, 120);
-
-        // RECEIVED AREA
-        var receivedLabel = new Label
+        // ---------------- MESSAGES CARD ----------------
+        var messagesCard = new RoundedPanel
         {
-            Text = "Messages",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = Color.White,
-            Location = new Point(32, 440),
-            AutoSize = true
+            Location = new Point(margin, composeCard.Bottom + gap),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+        };
+        messagesCard.Size = new Size(cardWidth, Math.Max(140, ClientSize.Height - messagesCard.Top - margin));
+
+        var messagesLabel = MakeSectionLabel("MESSAGES", 20, 12);
+
+        chatList = new ChatListBox
+        {
+            Location = new Point(14, 40),
+            Size = new Size(messagesCard.Width - 28, Math.Max(80, messagesCard.Height - 56)),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
         };
 
-        receivedBox = new TextBox
-        {
-            Location = new Point(30, 470),
-            Width = 685,
-            Height = 150,
-            Multiline = true,
-            ReadOnly = true,
-            ScrollBars = ScrollBars.Vertical,
-            BackColor = Color.FromArgb(28, 28, 28),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-        };
+        messagesCard.Controls.Add(messagesLabel);
+        messagesCard.Controls.Add(chatList);
 
-        statusLabel = new Label
-        {
-            Text = "● Connecting...",
-            ForeColor = Color.Goldenrod,
-            Location = new Point(30, 635),
-            AutoSize = true,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
-        };
-
-        // EVENTS
+        // ---------------- EVENTS ----------------
         createButton.Click += async (_, _) => await CreateRoom();
         joinButton.Click += async (_, _) => await JoinRoom();
         sendButton.Click += async (_, _) => await SendMessage();
@@ -213,39 +260,52 @@ public partial class Form1 : Form
 
         leaveButton.Click += async (_, _) => await LeaveRoom();
 
+        Resize += (_, _) => RepositionStatusPill();
+
+        // ---------------- ASSEMBLE ----------------
+        Controls.Add(logoMark);
         Controls.Add(title);
         Controls.Add(subtitle);
-        Controls.Add(usernameLabel);
-        Controls.Add(usernameBox);
-        Controls.Add(roomCodeLabel);
-        Controls.Add(roomBox);
-        Controls.Add(createButton);
-        Controls.Add(joinButton);
-        Controls.Add(roomLabel);
-        Controls.Add(usersLabel);
-        Controls.Add(leaveButton);
-        Controls.Add(messageBox);
-        Controls.Add(pasteButton);
-        Controls.Add(sendButton);
-        Controls.Add(copyButton);
-        Controls.Add(historyButton);
-        Controls.Add(receivedLabel);
-        Controls.Add(receivedBox);
-        Controls.Add(statusLabel);
+        Controls.Add(statusPill);
+        Controls.Add(divider);
+        Controls.Add(connectCard);
+        Controls.Add(roomBar);
+        Controls.Add(composeCard);
+        Controls.Add(messagesCard);
+
+        SetStatus("Connecting...", AppTheme.Warning);
     }
 
-    private Button MakeButton(string text, int x, int y, int width)
+    private static Label MakeSectionLabel(string text, int x, int y)
     {
-        return new Button
+        return new Label
         {
             Text = text,
+            Font = AppTheme.FontSectionLabel,
+            ForeColor = AppTheme.TextMuted,
+            BackColor = Color.Transparent,
             Location = new Point(x, y),
-            Width = width,
-            Height = 34,
-            BackColor = Color.FromArgb(45, 45, 45),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            AutoSize = true,
         };
+    }
+
+    private static ModernButton MakeButton(string text, ButtonKind kind, int x, int y, int width, int height)
+    {
+        return new ModernButton
+        {
+            Text = text,
+            Kind = kind,
+            Location = new Point(x, y),
+            Size = new Size(width, height),
+        };
+    }
+
+    private void RepositionStatusPill()
+    {
+        if (statusPill == null)
+            return;
+
+        statusPill.Left = Math.Max(28, ClientSize.Width - statusPill.Width - 28);
     }
 
     private async Task ConnectToServer()
@@ -260,13 +320,13 @@ public partial class Form1 : Form
                 cancellationTokenSource.Token
             );
 
-            SetStatus("● Connected", Color.LightGreen);
+            SetStatus("Connected", AppTheme.Success);
 
             _ = ReceiveMessages();
         }
         catch (Exception ex)
         {
-            SetStatus("● Connection failed", Color.Red);
+            SetStatus("Connection failed", AppTheme.Danger);
 
             MessageBox.Show(
                 $"Could not connect to CodeShare server.\n\n{ex.Message}",
@@ -314,7 +374,7 @@ public partial class Form1 : Form
         catch
         {
             if (!IsDisposed)
-                SetStatus("● Disconnected", Color.Red);
+                SetStatus("Disconnected", AppTheme.Danger);
         }
     }
 
@@ -346,10 +406,10 @@ public partial class Form1 : Form
                         leaveButton.Enabled = true;
 
                         history.Clear();
-                        receivedBox.Clear();
+                        chatList.ClearMessages();
                         lastMessageText = "";
 
-                        SetStatus("● In room", Color.LightGreen);
+                        SetStatus("In room", AppTheme.Success);
                     });
 
                     break;
@@ -361,7 +421,7 @@ public partial class Form1 : Form
 
                     RunOnUi(() =>
                     {
-                        SetStatus($"● {joinedUsername} joined", Color.LightGreen);
+                        SetStatus($"{joinedUsername} joined", AppTheme.Success);
                     });
 
                     break;
@@ -373,7 +433,7 @@ public partial class Form1 : Form
 
                     RunOnUi(() =>
                     {
-                        SetStatus($"● {leftUsername} left", Color.DarkOrange);
+                        SetStatus($"{leftUsername} left", AppTheme.Warning);
                     });
 
                     break;
@@ -385,7 +445,7 @@ public partial class Form1 : Form
 
                     RunOnUi(() =>
                     {
-                        usersLabel.Text = $"Users: {userCount}/10";
+                        usersLabel.Text = $"{userCount} / 10 users";
                     });
 
                     break;
@@ -397,7 +457,7 @@ public partial class Form1 : Form
                     RunOnUi(() =>
                     {
                         history.Clear();
-                        receivedBox.Clear();
+                        chatList.ClearMessages();
                         lastMessageText = "";
 
                         foreach (JsonElement message in messages.EnumerateArray())
@@ -412,7 +472,7 @@ public partial class Form1 : Form
                     RunOnUi(() =>
                     {
                         AddMessageToScreen(document.RootElement);
-                        SetStatus("● New message", Color.LightGreen);
+                        SetStatus("New message", AppTheme.Success);
                     });
 
                     break;
@@ -420,15 +480,15 @@ public partial class Form1 : Form
                 case "left":
                     RunOnUi(() =>
                     {
-                        roomLabel.Text = "Room: -";
-                        usersLabel.Text = "Users: 0/10";
+                        roomLabel.Text = "Room: —";
+                        usersLabel.Text = "0 / 10 users";
                         sendButton.Enabled = false;
                         leaveButton.Enabled = false;
-                        receivedBox.Clear();
+                        chatList.ClearMessages();
                         history.Clear();
                         lastMessageText = "";
 
-                        SetStatus("● Connected", Color.LightGreen);
+                        SetStatus("Connected", AppTheme.Success);
                     });
 
                     break;
@@ -479,14 +539,10 @@ public partial class Form1 : Form
         if (DateTime.TryParse(time, out DateTime parsed))
             formattedTime = parsed.ToLocalTime().ToString("HH:mm:ss");
 
-        string formatted =
-            $"[{formattedTime}] {username}:\r\n{text}\r\n\r\n";
+        var chatMessage = new ChatMessage(username, formattedTime, text);
 
-        history.Add(formatted);
-
-        receivedBox.AppendText(formatted);
-        receivedBox.SelectionStart = receivedBox.Text.Length;
-        receivedBox.ScrollToCaret();
+        history.Add(chatMessage);
+        chatList.AddMessage(chatMessage);
     }
 
     private async Task SendJson(object data)
@@ -576,7 +632,7 @@ public partial class Form1 : Form
         });
 
         messageBox.Clear();
-        SetStatus("● Sent", Color.LightGreen);
+        SetStatus("Sent", AppTheme.Success);
     }
 
     private void PasteText()
@@ -591,7 +647,7 @@ public partial class Form1 : Form
         if (!string.IsNullOrEmpty(lastMessageText))
         {
             Clipboard.SetText(lastMessageText);
-            SetStatus("● Last message copied", Color.LightGreen);
+            SetStatus("Last message copied", AppTheme.Success);
         }
     }
 
@@ -599,28 +655,48 @@ public partial class Form1 : Form
     {
         using Form historyForm = new Form
         {
-            Text = "CodeShare - History",
-            Width = 750,
-            Height = 600,
+            Text = "CodeShare — History",
+            Width = 760,
+            Height = 620,
+            MinimumSize = new Size(480, 360),
             StartPosition = FormStartPosition.CenterParent,
-            BackColor = Color.FromArgb(18, 18, 18),
-            ForeColor = Color.White
+            BackColor = AppTheme.WindowBackground,
+            ForeColor = AppTheme.TextPrimary,
+            Font = AppTheme.FontBody,
         };
 
-        TextBox historyBox = new TextBox
+        var headerLabel = new Label
         {
-            Multiline = true,
-            ReadOnly = true,
-            ScrollBars = ScrollBars.Both,
-            Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(28, 28, 28),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.None,
-            Font = new Font("Consolas", 10),
-            Text = string.Join("", history)
+            Text = "Message History",
+            Font = AppTheme.FontRoomLabel,
+            ForeColor = AppTheme.TextPrimary,
+            BackColor = Color.Transparent,
+            Location = new Point(24, 20),
+            AutoSize = true,
         };
 
-        historyForm.Controls.Add(historyBox);
+        var countLabel = new Label
+        {
+            Text = history.Count == 1 ? "1 message" : $"{history.Count} messages",
+            Font = AppTheme.FontSmall,
+            ForeColor = AppTheme.TextMuted,
+            BackColor = Color.Transparent,
+            Location = new Point(24, 46),
+            AutoSize = true,
+        };
+
+        var historyList = new ChatListBox
+        {
+            Location = new Point(20, 76),
+            Size = new Size(historyForm.ClientSize.Width - 40, historyForm.ClientSize.Height - 96),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+        };
+
+        historyList.LoadMessages(history);
+
+        historyForm.Controls.Add(historyList);
+        historyForm.Controls.Add(headerLabel);
+        historyForm.Controls.Add(countLabel);
 
         historyForm.ShowDialog(this);
     }
@@ -638,8 +714,8 @@ public partial class Form1 : Form
         if (IsDisposed)
             return;
 
-        statusLabel.Text = text;
-        statusLabel.ForeColor = color;
+        statusPill.SetStatus(text, color);
+        RepositionStatusPill();
     }
 
     private void RunOnUi(Action action)
