@@ -1,0 +1,15 @@
+C:\Users\jenko\CodeShare\bin\Debug\net10.0-windows\CodeShare.exe
+C:\Users\jenko\CodeShare\bin\Debug\net10.0-windows\CodeShare.deps.json
+C:\Users\jenko\CodeShare\bin\Debug\net10.0-windows\CodeShare.runtimeconfig.json
+C:\Users\jenko\CodeShare\bin\Debug\net10.0-windows\CodeShare.dll
+C:\Users\jenko\CodeShare\bin\Debug\net10.0-windows\CodeShare.pdb
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.AssemblyInfoInputs.cache
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.AssemblyInfo.cs
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.csproj.CoreCompileInputs.cache
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.sourcelink.json
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.dll
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\refint\CodeShare.dll
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.pdb
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\CodeShare.genruntimeconfig.cache
+C:\Users\jenko\CodeShare\obj\Debug\net10.0-windows\ref\CodeShare.dll
